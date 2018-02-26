@@ -2,9 +2,13 @@
   "name": "cmdlets",
   "version": "0.1.0",
   "description": "node-js based command os",
+  "repository" : {
+    "type" : "git",
+    "url" : "https://randydu@bitbucket.org/randydu/cmdlets.git"
+  },
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "hello": "node run.js hello"
   },
   "author": "randydu@gmail.com",
   "license": "ISC",

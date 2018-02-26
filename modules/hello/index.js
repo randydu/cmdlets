@@ -6,7 +6,7 @@ module.exports = {
             name: "hello",
             help: "Say Hello World (DEMO)",
             
-            run: (srv, cb)=>{
+            run: (cb)=>{
                 //access local config
                 srv.message(`Hello ${srv.etc.hello.who}!\n`);
                 cb();

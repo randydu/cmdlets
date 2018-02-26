@@ -135,7 +135,7 @@ srv.logfile = function(filename){
 
 function getTasks(cmds){
     return cmds.map(cmd => (cb)=>{ 
-        cmd.run(srv, err => {
+        cmd.run(err => {
             if(err){
                 srv.error(cmd.name + ": error " + err);
                 if(cb) cb(err);
@@ -179,7 +179,7 @@ srv.run = function(){
                 if(cmd){
                     srv.title("[" + cmd.name + "]: " + cmd.help);
                     console.time(param);
-                    cmd.run(srv, err => srv.summary(param, err));
+                    cmd.run(err => srv.summary(param, err));
                 }else{
                     srv.warning("Warning: Invalid command name: [" + param + ']!'); 
                 }
@@ -188,14 +188,20 @@ srv.run = function(){
     }
 };
 
-//Parsing plugins
-var mods = fs.readdirSync(__dirname + "/modules");
-mods.forEach( m => {
-    let mdir = __dirname + "/modules/" + m;
-    
+// load a module/plugin
+srv.loadModule = function(name, dir){
     //load cmdlet's local configuration
-    let cfg = mdir + "/etc/config.json";
-    if(fs.existsSync(cfg)) srv.etc[m] = require(cfg);
+    let cfg = dir + "/etc/config.json";
+    if(fs.existsSync(cfg)) srv.etc[name] = require(cfg);
 
-    require(mdir).init(srv);
-});
+    //install cmds
+    require(dir).init(srv);
+};
+
+//Loading built-in plugins in sub-folder "modules"
+let local_module_dir = __dirname + "/modules/";
+if(fs.existsSync(local_module_dir)){
+    fs.readdirSync(local_module_dir).forEach( m => {
+        srv.loadModule(m, local_module_dir + m);
+    });
+}

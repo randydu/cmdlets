@@ -132,20 +132,36 @@ srv.logfile = function(filename){
     return f;
 };
   
-
-function getTasks(cmds){
-    return cmds.map(cmd => (cb)=>{ 
-        cmd.run(err => {
+srv.runCmd = function(cmd, cb){
+    if(cmd.sync){//sync version
+        try {
+            let rc = cmd.run();
+            cb(null, rc);
+        }catch(err){
+            cb(err);
+        }
+    }else{//async
+        let my_cb = (err, rc) => {
             if(err){
                 srv.error(cmd.name + ": error " + err);
-                if(cb) cb(err);
+                if(cb) cb(err, rc);
                 if(srv.exitOnError) process.exit(1);
             }else{
                 srv.success(cmd.name + ": done!");
-                if(cb) cb(null);
+                if(cb) cb(null, rc);
             }
-        });
-    });
+        };
+
+        let result = cmd.run(my_cb);
+        //Promise support
+        if(result instanceof Promise){
+            result.then(rc => my_cb(null, rc)).catch(my_cb);
+        }
+    }
+};
+
+function getTasks(cmds){
+    return cmds.map(cmd => srv.runCmd.bind(null, cmd));
 }
 
 //cmds: array of cmd
@@ -157,10 +173,9 @@ srv.runCmdsParallel = function(cmds, cb){
     async.parallel(getTasks(cmds), cb); 
 };
 
-
 srv.run = function(){
     if(process.argv.length <= 2){
-        console.log("Format:  node run.js [cmd1, cmd2, ...]\n");
+        console.log(`Format:  node ${process.argv[1]} [cmd1, cmd2, ...]\n`);
         console.log("Available commands are:\n");
         for( var name in srv.cmds){
             console.log("    " + name.yellow + ": " + (srv.cmds[name].help).green);
@@ -179,7 +194,7 @@ srv.run = function(){
                 if(cmd){
                     srv.title("[" + cmd.name + "]: " + cmd.help);
                     console.time(param);
-                    cmd.run(err => srv.summary(param, err));
+                    srv.runCmd(cmd, err => srv.summary(param, err));
                 }else{
                     srv.warning("Warning: Invalid command name: [" + param + ']!'); 
                 }

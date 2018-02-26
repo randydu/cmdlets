@@ -10,6 +10,7 @@ features:
 - flexible cmd execution order;
 - cmd configuration;
 - cmd timing;
+- three types of cmd::run();
 
 
 Example
@@ -24,8 +25,9 @@ module.exports = {
         //install commands
         srv.installCmd({
             name: 'foo',
-            help: 'demo A',
-            run(cb){
+            help: 'demo of async-callback',
+
+            run(cb){ //classic async callback
                 srv.message('foo >>');
                 cb();
             }
@@ -33,12 +35,24 @@ module.exports = {
 
         srv.installCmd({
             name: 'bar',
-            help: 'demo B',
-            run(cb){
+            help: 'demo of sync',
+            sync: true, //sync version
+
+            run(){ 
                 srv.message('bar >>');
-                cb();
             }
-        })
+        });
+
+        srv.installCmd({
+            name: 'zoo',
+            help: 'demo of promise',
+
+            run(){
+                srv.message('zoo >>');
+                return Promise.resolve();
+            }
+        });
+
     }
 }
 

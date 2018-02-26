@@ -94,3 +94,10 @@ node index.js foo bar
 node index.js foo*bar hello
 ```
 
+
+ENVIRONMENT
+===========
+- SHOW_HIDDEN_CMD (1*|0)
+  if set to *1*, display all hidden cmds on the menu; default 1;
+
+ 

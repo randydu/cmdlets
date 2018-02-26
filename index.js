@@ -133,6 +133,10 @@ srv.logfile = function(filename){
 };
   
 srv.runCmd = function(cmd, cb){
+    if(typeof cmd === 'string'){//call by name
+        cmd = srv.getCmd(cmd);
+    }
+
     if(cmd.sync){//sync version
         try {
             let rc = cmd.run();
@@ -177,8 +181,10 @@ srv.run = function(){
     if(process.argv.length <= 2){
         console.log(`Format:  node ${process.argv[1]} [cmd1, cmd2, ...]\n`);
         console.log("Available commands are:\n");
-        for( var name in srv.cmds){
-            console.log("    " + name.yellow + ": " + (srv.cmds[name].help).green);
+        let showHidden = Boolean(+process.env.SHOW_HIDDEN_CMD);
+        for(var name in srv.cmds){
+            let cmd = srv.cmds[name];
+            if(showHidden || !cmd.hidden) console.log("    " + name.yellow + ": " + (cmd.help).green);
         }
     }else{
         process.argv.slice(2).forEach(param => {
@@ -206,9 +212,12 @@ srv.run = function(){
 // load a module/plugin
 srv.loadModule = function(name, dir){
     //load cmdlet's local configuration
-    let cfg = dir + "/etc/config.json";
+    let cfg = dir + "/config.json";
     if(fs.existsSync(cfg)) srv.etc[name] = require(cfg);
-
+    else {
+        cfg = dir + "/etc/config.json";
+        if(fs.existsSync(cfg)) srv.etc[name] = require(cfg);
+    }
     //install cmds
     require(dir).init(srv);
 };
@@ -219,4 +228,10 @@ if(fs.existsSync(local_module_dir)){
     fs.readdirSync(local_module_dir).forEach( m => {
         srv.loadModule(m, local_module_dir + m);
     });
+}
+
+//Hide all built-in cmds so it won't be shown in cmd menu.
+//However, they can still be executed by srv.getCmd('hello');
+for(var m in srv.cmds){
+    srv.cmds[m].hidden = true;
 }

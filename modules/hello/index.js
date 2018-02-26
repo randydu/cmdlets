@@ -7,7 +7,8 @@ module.exports = {
             help: "Say Hello World (DEMO)",
             
             run: (srv, cb)=>{
-                srv.message('Hello World!\n');
+                //access local config
+                srv.message(`Hello ${srv.etc.hello.who}!\n`);
                 cb();
             }
         });

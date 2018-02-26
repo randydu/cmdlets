@@ -1,0 +1,8 @@
+{
+    "description": "System Configuration",
+
+    "envs": {
+        "description": "System-wide environments",
+        "value": ["HOME"]
+    }
+}

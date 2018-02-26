@@ -1,0 +1,15 @@
+{
+  "name": "cmdlets",
+  "version": "0.1.0",
+  "description": "node-js based command os",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "randydu@gmail.com",
+  "license": "ISC",
+  "dependencies": {
+    "async": "^2.6.0",
+    "colors": "^1.1.2"
+  }
+}

@@ -1,6 +1,6 @@
 'uses strict';
 
-const process = require('process');
+const path = require('path');
 const fs = require("fs");
 const colors = require("colors");
 const async = require("async");
@@ -179,7 +179,7 @@ srv.runCmdsParallel = function(cmds, cb){
 
 srv.run = function(){
     if(process.argv.length <= 2){
-        console.log(`Format:  node ${process.argv[1]} [cmd1, cmd2, ...]\n`);
+        console.log(`Format:  node ${path.basename(process.argv[1])} [cmd1, cmd2, ...]\n`);
         console.log("Available commands are:\n");
         let showHidden = Boolean(+process.env.SHOW_HIDDEN_CMD);
         for(var name in srv.cmds){

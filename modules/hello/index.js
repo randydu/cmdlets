@@ -6,7 +6,7 @@ module.exports = {
             name: "hello",
             help: "Say Hello World",
             
-            run: (cb)=>{
+            run(cb){
                 srv.message('Hello World!\n');
                 cb();
             }
@@ -16,7 +16,7 @@ module.exports = {
             name: "foo",
             help: "Say FOO",
             
-            run: ()=>{
+            run(){
                 srv.message('Hello FOO!\n');
                 return Promise.resolve() ;
             }
@@ -27,8 +27,18 @@ module.exports = {
             help: "Say BAR",
             sync: true, //sync version
             
-            run: ()=>{
+            run(){
                 srv.message('Hello BAR!\n');
+            }
+        });
+
+        srv.installCmd({
+            name: "dummy",
+            help: "async dummy demo",
+            
+            async run(){
+                srv.message('dummy!\n');
+                return;
             }
         });
     }

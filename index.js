@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require("fs");
 const colors = require("colors");
 const async = require("async");
+const JSON5 = require('json5');
 
 
 const srv = {};
@@ -112,8 +113,8 @@ srv.summary = function(name, err){
             console.log(s.red);
     
             for( var i in errs){
-            console.log(("[" + i + "]: ").red);
-            console.log(errs[i].red);
+                console.log(("[" + i + "]: ").red);
+                console.log(errs[i].red);
             }
         }
     }else{
@@ -131,32 +132,38 @@ srv.logfile = function(filename){
     f.close = function(){ fs.closeSync(fd); };
     return f;
 };
-  
-srv.runCmd = function(cmd, cb){
+
+//call cmd with args
+//if args is of an array, the cmd.run() assumes to accept param list;
+//otherwise it is accepting null or object as command parameter; 
+srv.runCmd = function(cmd, args, cb){
     if(typeof cmd === 'string'){//call by name
-        cmd = srv.getCmd(cmd);
+        let my_cmd = srv.getCmd(cmd);
+        if(my_cmd === null) throw new Error(`Invalid command: ${cmd}`);
+
+        cmd = my_cmd;
     }
+
+    let my_cb = (err, rc) => {
+        if(err){
+            srv.error(cmd.name + ": error " + err);
+            if(cb) cb(err, rc);
+            if(srv.exitOnError) process.exit(1);
+        }else{
+            srv.success(cmd.name + ": done!");
+            if(cb) cb(null, rc);
+        }
+    };
 
     if(cmd.sync){//sync version
         try {
-            let rc = cmd.run();
-            cb(null, rc);
+            let rc = args instanceof Array ? cmd.run.apply(cmd, args) : cmd.run(args);
+            my_cb(null, rc);
         }catch(err){
-            cb(err);
+            my_cb(err);
         }
     }else{//async
-        let my_cb = (err, rc) => {
-            if(err){
-                srv.error(cmd.name + ": error " + err);
-                if(cb) cb(err, rc);
-                if(srv.exitOnError) process.exit(1);
-            }else{
-                srv.success(cmd.name + ": done!");
-                if(cb) cb(null, rc);
-            }
-        };
-
-        let result = cmd.run(my_cb);
+        let result = args instanceof Array ? cmd.run.apply(cmd, args.concat([ my_cb ])) : cmd.run(args, my_cb);
         //Promise support
         if(result instanceof Promise){
             result.then(rc => my_cb(null, rc)).catch(my_cb);
@@ -164,13 +171,13 @@ srv.runCmd = function(cmd, cb){
     }
 };
 
-function getTasks(cmds){
-    return cmds.map(cmd => srv.runCmd.bind(null, cmd));
+function getTasks(call_cmds){
+    return call_cmds.map(cc => srv.runCmd.bind(null, cc.cmd, cc.args));
 }
 
 //cmds: array of cmd
-srv.runCmdsCascade = function(cmds, cb){
-    async.series(getTasks(cmds), cb); 
+srv.runCmdsCascade = function(call_cmds, cb){
+    async.series(getTasks(call_cmds), cb); 
 };
 
 srv.runCmdsParallel = function(cmds, cb){
@@ -187,25 +194,73 @@ srv.run = function(){
             if(showHidden || !cmd.hidden) console.log("    " + name.yellow + ": " + (cmd.help).green);
         }
     }else{
-        process.argv.slice(2).forEach(param => {
-            //Cascade: cmd1 * cmd2 * cmd 3
-            var cmdNames = param.split('*').map(e => e.trim());
-            if(cmdNames.length > 1){
-                srv.title("Running Batch Cmds [" + param + "]...");
+        try {
+            process.argv.slice(2).forEach(param => {
+                //parse cmdlet and returns { cmd, args }
+                //valid format:
+                //- fn : no param  => { cmd: fn, args: null }
+                //- fn(): no param => { cmd: fn, args: null }
+                //- fn('randy',20): param value list => { cmd: fn, args: ['randy', 20 ] }
+                //- fn(name: 'randy', age: 20): named param list (JSON5 compatible)
+                //  => { cmd: fn, args: { name: 'randy', age: 20 } }
+                //
+                // returns { cmd: null, args: null } if fn cannot be resolved.
+                function parseCmd(cmdlet){
+                    let cmd_name = cmdlet;
+                    let args = null;
 
-                console.time(param);
-                srv.runCmdsCascade(cmdNames.map(name => srv.getCmd(name)), err => srv.summary(param, err));
-            }else{
-                var cmd = srv.getCmd(param);
-                if(cmd){
+                    let i = cmdlet.indexOf('(');
+                    if(i !== -1){
+                        //fn() or fn(x,y, ...)
+                        let j = cmdlet.indexOf(')', i+1);
+                        if( j === -1) throw new Error('parameter parsing error: no ending ")"');
+
+                        cmd_name = cmdlet.substr(0, i);
+
+                        let params = cmdlet.substr(i+1, j-i-1).trim();
+
+                        if(params.length === 0){//fn()
+                        } else {// fn(x,y) or fn(name: 'x', age: y)
+                            //the most simplified parsing, the limit is that
+                            //the ':' should not exist in any value.
+                            if( -1 === params.indexOf(':')){
+                                args = params.split(',').map(x => x.trim());
+                            } else {
+                                args = JSON5.parse(`{${params}}`);
+                            }
+                        }
+                    }
+
+                    let cmd = srv.getCmd(cmd_name);
+                    if(cmd === null){
+                        throw new Error(`Invalid command: [${cmdlet}]`);
+                    }
+
+                    return  { cmd, args };
+                }            
+
+                //Cascade: cmd1 * cmd2 * cmd 3
+                const cmdlets = param.split('*').map(e => e.trim()).filter(x => x !== '');
+                if(cmdlets.length === 0) return; //' * ', no cmd to execute, ignore.
+
+                if(cmdlets.length > 1){
+                    srv.title("Running Batch Cmds [" + param + "]...");
+
+                    console.time(param);
+                    srv.runCmdsCascade(cmdlets.map(cmdlet => parseCmd(cmdlet)), err => srv.summary(param, err));
+                }else{
+                    param = cmdlets[0];
+                    var call_cmd = parseCmd(param);
+                    let cmd = call_cmd.cmd;
+
                     srv.title("[" + cmd.name + "]: " + cmd.help);
                     console.time(param);
-                    srv.runCmd(cmd, err => srv.summary(param, err));
-                }else{
-                    srv.warning("Warning: Invalid command name: [" + param + ']!'); 
+                    srv.runCmd(cmd, call_cmd.args, err => srv.summary(param, err));
                 }
-            }
-        });
+            });
+        }catch(err){
+            srv.error(err);
+        }
     }
 };
 

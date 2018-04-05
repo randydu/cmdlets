@@ -4,11 +4,20 @@ module.exports = {
     init(srv){
         srv.installCmd({
             name: "hello",
-            help: "Say Hello World",
+            help: "Say Hello, hello(whom)",
             
-            run(cb){
-                srv.message('Hello World!\n');
+            run(whom, cb){
+                srv.message(`Hello ${whom}!\n`);
                 cb();
+            }
+        });
+
+        srv.installCmd({
+            name: "welcome",
+            help: "Say Welcome, welcome(name: 'randy')",
+            
+            async run( args ){
+                srv.message(`Welcome ${args.name}!\n`);
             }
         });
 

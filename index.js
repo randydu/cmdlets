@@ -20,6 +20,8 @@ srv.etc.sys = require("./etc/config.json");
 
 srv.exitOnError = true; //abort on command error
 
+//current module name being loaded
+var cur_module_name = '';
 
 //capture system environments used in the build
 let sys_envs = {};
@@ -68,6 +70,11 @@ srv.addError = function(cmdName, errMsg){
       
   
 srv.installCmd = function(cmd){
+    if(typeof cmd.group === 'undefined'){
+        //cmd group node specified, fall back to default one (the current module name being loaded)
+        cmd.group = cur_module_name;
+    }
+
     srv.cmds[cmd.name] = cmd;
 };
 
@@ -184,15 +191,50 @@ srv.runCmdsParallel = function(cmds, cb){
     async.parallel(getTasks(cmds), cb); 
 };
 
+srv.showMenu = function(){
+    console.log(`Format:  node ${path.basename(process.argv[1])} [cmd1, cmd2, ...]\n`);
+    console.log("Available commands are:\n");
+
+    let showHidden = Boolean(+process.env.SHOW_HIDDEN_CMD);
+
+    //populate cmds by group
+    let grps = {};
+    let grp_names = [];
+    
+    for(let name in srv.cmds){
+        let cmd = srv.getCmd(name);
+        let grp_name = cmd.group;
+
+        if(typeof grps[grp_name] === 'undefined'){
+            grps[grp_name] = [];
+            grp_names.push(grp_name);
+        }
+
+        if(showHidden || !cmd.hidden) grps[grp_name].push(cmd);
+    }
+
+    //sort group name
+    grp_names.sort();
+
+    grp_names.forEach(grp_name => {
+        let cmds = grps[grp_name];
+        if(cmds.length > 0){
+            console.log('');
+            console.log(`[${grp_name}]`.blueBG);
+
+            //sort cmd by name
+            cmds.sort((a,b)=> a.name.localeCompare(b.name));
+
+            cmds.forEach(cmd => {
+                if(showHidden || !cmd.hidden) console.log("    " + cmd.name.yellow + ": " + (cmd.help).green);
+            });
+        }
+    });
+}
+
 srv.run = function(){
     if(process.argv.length <= 2){
-        console.log(`Format:  node ${path.basename(process.argv[1])} [cmd1, cmd2, ...]\n`);
-        console.log("Available commands are:\n");
-        let showHidden = Boolean(+process.env.SHOW_HIDDEN_CMD);
-        for(var name in srv.cmds){
-            let cmd = srv.cmds[name];
-            if(showHidden || !cmd.hidden) console.log("    " + name.yellow + ": " + (cmd.help).green);
-        }
+        srv.showMenu();
     }else{
         try {
             process.argv.slice(2).forEach(param => {
@@ -246,8 +288,21 @@ srv.run = function(){
                 if(cmdlets.length > 1){
                     srv.title("Running Batch Cmds [" + param + "]...");
 
+                    let call_cmds = cmdlets.map(cmdlet => parseCmd(cmdlet));
+                    call_cmds.forEach((cc, i) => {
+                        let cmd = cc.cmd;
+                        if(typeof cmd.init === 'function'){
+                            cmd.init({
+                                args: cc.args,
+                                index: i,
+
+                                ccs: call_cmds
+                            });
+                        }
+                    });
+
                     console.time(param);
-                    srv.runCmdsCascade(cmdlets.map(cmdlet => parseCmd(cmdlet)), err => srv.summary(param, err));
+                    srv.runCmdsCascade(call_cmds, err => srv.summary(param, err));
                 }else{
                     param = cmdlets[0];
                     var call_cmd = parseCmd(param);
@@ -274,7 +329,9 @@ srv.loadModule = function(name, dir){
         if(fs.existsSync(cfg)) srv.etc[name] = require(cfg);
     }
     //install cmds
+    cur_module_name = name; //default group name, ref: installCmd()
     require(dir).init(srv);
+    cur_module_name = '';
 };
 
 //Loading built-in plugins in sub-folder "modules"
@@ -284,6 +341,7 @@ if(fs.existsSync(local_module_dir)){
         srv.loadModule(m, local_module_dir + m);
     });
 }
+
 
 //Hide all built-in cmds so it won't be shown in cmd menu.
 //However, they can still be executed by srv.getCmd('hello');

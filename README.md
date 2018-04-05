@@ -7,10 +7,13 @@ A simple command-oriented system
 
 features:
 
-- flexible cmd execution order;
+- cmd execution order serial or parallel;
 - cmd configuration;
 - cmd timing;
-- three types of cmd::run();
+- cmd parameters;
+- cmd group;
+- cmd delay / repeat;
+- four types of cmd::run();
 
 Example
 -------
@@ -23,7 +26,7 @@ In this sample, we will develop a demo cmdlet in foobar sub-folder "foobar":
 
 module.exports = {
     init(srv){
-        //install commands
+        //install commands (default group: 'foobar' specified in srv.loadModule())
         srv.installCmd({
             name: 'foo',
             help: 'demo of async-callback',
@@ -64,6 +67,24 @@ module.exports = {
             }
         });
 
+        //explicitly specify group to override default one (foobar)
+        srv.installCmd({
+            name: 'add',
+            group: 'math',
+            help: 'addition, ex: add( a, b)=> a+b',
+            async run(a, b){
+                srv.message(`${a}+${b}=${a + b}`);
+            }
+        });
+
+        srv.installCmd({
+            name: 'sub',
+            group: 'math',
+            help: 'substraction, ex: sub( a: 2, b: 1)=> a-b',
+            async run({a, b}){
+                srv.message(`${a}-${b}=${a - b}`);
+            }
+        })
     }
 }
 
@@ -87,45 +108,94 @@ Now we can invoke cmdlet "foo" and "bar" as following:
 - show help menu
 
 ```bash
-node index.js
+node index
+```
 
+The output will be grouped by group name and sorted by cmd name:
+
+```
 Available commands are:
 
-    hello: Say Hello World
-    foo: Say FOO
+[foobar]
     bar: Say BAR
     dummy: async dummy demo
+    foo: Say FOO
+    hello: Say Hello World
+    zoo: demo of promise
+
+[math]
+    add: addition, ex: add( a, b)=> a+b
+    sub: substraction, ex: sub( a: 2, b: 1)=> a-b
 ```
 
 
 - run a single cmd
 
 ```bash
-node index.js foo
+node index foo
 ```
 
 - run cmds one by one
 
 ```bash
-node index.js foo*bar
+node index foo*bar
 ```
 
 - run cmds in parallel
 
 ```bash
-node index.js foo bar
+node index foo bar
 ```
 
 - run cmds in mixed order
 
 ```bash
-node index.js foo*bar hello
+node index foo*bar hello
 ```
+
+- run cmd with param list
+
+```bash
+node index "add(1,2)"
+```
+
+- run cmd with named param list
+
+```bash
+node index "sub(a:1, b:2)"
+```
+
+- repeat cmd
+
+Repeat cmd "foo" three times with 5 seconds interval:
+
+```bash
+node index "foo * repeat(3, 5)"
+```
+
+Repeat cmd "bar" three times without delay (internal = 0):
+
+```bash
+node index "foo * repeat(3)"
+```
+
+- delay cmd
+
+runs "foo" first, delays 10 seconds, then runs "bar" next.
+
+```bash
+node index "foo * delay(10) * bar"
+```
+
 
 ENVIRONMENT
 -----------
 
-- SHOW_HIDDEN_CMD (1*|0)
+- SHOW_HIDDEN_CMD (1|0*)
   if set to *1*, display all hidden cmds on the menu; default 0;
 
- 
+show hidden cmds:
+
+```bash
+SHOW_HIDDEN_CMD=1 node index
+```

@@ -6,7 +6,7 @@ Changelog
 * supports bash friendly cmdlet param delimiters.
 
   for bash, the '(', ')' is special characters so instead of add(1,2) we have to input "add(1,2)".
-  now we can use add[1,2] as a workaround.  
+  now we can use add[1,2] as a workaround.
 
 0.4.0: ( Apr. 4, 2018)
 ----------------------

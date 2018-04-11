@@ -73,7 +73,7 @@ module.exports = {
             group: 'math',
             help: 'addition, ex: add( a, b)=> a+b',
             async run(a, b){
-                srv.message(`${a}+${b}=${a + b}`);
+                srv.message(`${a}+${b}=${(+a) + (+b)}`);
             }
         });
 
@@ -159,11 +159,31 @@ node index foo*bar hello
 node index "add(1,2)"
 ```
 
+or
+
+```bash
+node index add[1,2]
+```
+
+the output is:
+
+> 1+2=3
+
 - run cmd with named param list
 
 ```bash
 node index "sub(a:1, b:2)"
 ```
+
+or
+
+```bash
+node index sub[a:1, b:2]
+```
+
+the output is:
+
+> 1-2=-1
 
 - repeat cmd
 

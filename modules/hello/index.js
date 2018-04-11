@@ -56,7 +56,7 @@ module.exports = {
             group: 'math',
             help: 'addition, ex: add( a, b)=> a+b',
             async run(a, b){
-                srv.message(`${a}+${b}=${(+a) + (+b)}`);
+                srv.message(`${a}+${b}=${(+a)+(+b)}`);
             }
         });
 
@@ -65,7 +65,8 @@ module.exports = {
             group: 'math',
             help: 'substraction, ex: sub( a: 2, b: 1)=> a-b',
             async run({a, b}){
-                srv.message(`${a}-${b}=${(+a) - (+b)}`);
+                //srv.message(`${a}-${b}=${(+a)-(+b)}`);
+                srv.message(`${a}-${b}=${a-b}`);
             }
         })
     }

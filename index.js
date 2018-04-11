@@ -248,34 +248,44 @@ srv.run = function(){
                 //
                 // returns { cmd: null, args: null } if fn cannot be resolved.
                 function parseCmd(cmdlet){
+                    console.log('cmdlet: ' + cmdlet);
                     let cmd_name = cmdlet;
                     let args = null;
 
-                    let i = cmdlet.indexOf('(');
-                    if(i !== -1){
-                        //fn() or fn(x,y, ...)
-                        let j = cmdlet.indexOf(')', i+1);
-                        if( j === -1) throw new Error('parameter parsing error: no ending ")"');
+                    //return true if func call is detected.
+                    function parseCall(leftDelimeter, rightDelimiter){
+                        let i = cmdlet.indexOf(leftDelimeter);
+                        if(i !== -1){
+                            //fn() or fn(x,y, ...)
+                            let j = cmdlet.length-1;
+                            if( rightDelimiter !== cmdlet[j]) throw new Error(`parameter parsing error: no ending "${rightDelimiter}"`);
 
-                        cmd_name = cmdlet.substr(0, i);
+                            cmd_name = cmdlet.substr(0, i);
 
-                        let params = cmdlet.substr(i+1, j-i-1).trim();
+                            let params = cmdlet.substr(i+1, j-i-1).trim();
 
-                        if(params.length === 0){//fn()
-                        } else {// fn(x,y) or fn(name: 'x', age: y)
-                            //the most simplified parsing, the limit is that
-                            //the ':' should not exist in any value.
-                            if( -1 === params.indexOf(':')){
-                                args = params.split(',').map(x => x.trim());
-                            } else {
-                                args = JSON5.parse(`{${params}}`);
+                            if(params.length === 0){//fn()
+                            } else {// fn(x,y) or fn(name: 'x', age: y)
+                                //the most simplified parsing, the limit is that
+                                //the ':' should not exist in any value.
+                                if( -1 === params.indexOf(':')){
+                                    args = params.split(',').map(x => x.trim());
+                                } else {
+                                    args = JSON5.parse(`{${params}}`);
+                                }
                             }
+                            return true;
                         }
+                        return false;
                     }
+
+                    parseCall('(', ')') /*fn(), fn(x,y)*/ || parseCall('[', ']'); /* fn[], fn[x,y] */ 
+
+                    if(cmd_name == '') throw new Error('cmdlet name is empty!');
 
                     let cmd = srv.getCmd(cmd_name);
                     if(cmd === null){
-                        throw new Error(`Invalid command: [${cmdlet}]`);
+                        throw new Error(`Invalid command: ${cmd_name}`);
                     }
 
                     return  { cmd, args };

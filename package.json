@@ -1,10 +1,10 @@
 {
   "name": "cmdlets",
-  "version": "0.4.1",
-  "description": "node-js based command os",
+  "version": "0.4.2",
+  "description": "node-js based command system",
   "repository": {
     "type": "git",
-    "url": "https://randydu@bitbucket.org/randydu/cmdlets.git"
+    "url": "https://bitbucket.org/randydu/cmdlets.git"
   },
   "main": "index.js",
   "scripts": {

@@ -19,7 +19,7 @@ module.exports = {
             }
         });
 
-        // " cmd * repeat(3, 5)"
+        // "cmd*repeat(3, 5)"
         srv.installCmd({
             name: 'repeat',
             help: 'repeat cmd execution, repeat(count, [interval=0])',

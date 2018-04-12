@@ -232,101 +232,114 @@ srv.showMenu = function(){
     });
 }
 
-srv.run = function(){
-    if(process.argv.length <= 2){
-        srv.showMenu();
-    }else{
-        try {
-            process.argv.slice(2).forEach(param => {
-                //parse cmdlet and returns { cmd, args }
-                //valid format:
-                //- fn : no param  => { cmd: fn, args: null }
-                //- fn(): no param => { cmd: fn, args: null }
-                //- fn('randy',20): param value list => { cmd: fn, args: ['randy', 20 ] }
-                //- fn(name: 'randy', age: 20): named param list (JSON5 compatible)
-                //  => { cmd: fn, args: { name: 'randy', age: 20 } }
-                //
-                // returns { cmd: null, args: null } if fn cannot be resolved.
-                function parseCmd(cmdlet){
-                    console.log('cmdlet: ' + cmdlet);
-                    let cmd_name = cmdlet;
-                    let args = null;
-
-                    //return true if func call is detected.
-                    function parseCall(leftDelimeter, rightDelimiter){
-                        let i = cmdlet.indexOf(leftDelimeter);
-                        if(i !== -1){
-                            //fn() or fn(x,y, ...)
-                            let j = cmdlet.length-1;
-                            if( rightDelimiter !== cmdlet[j]) throw new Error(`parameter parsing error: no ending "${rightDelimiter}"`);
-
-                            cmd_name = cmdlet.substr(0, i);
-
-                            let params = cmdlet.substr(i+1, j-i-1).trim();
-
-                            if(params.length === 0){//fn()
-                            } else {// fn(x,y) or fn(name: 'x', age: y)
-                                //the most simplified parsing, the limit is that
-                                //the ':' should not exist in any value.
-                                if( -1 === params.indexOf(':')){
-                                    args = params.split(',').map(x => x.trim());
-                                } else {
-                                    args = JSON5.parse(`{${params}}`);
-                                }
-                            }
-                            return true;
-                        }
-                        return false;
-                    }
-
-                    parseCall('(', ')') /*fn(), fn(x,y)*/ || parseCall('[', ']'); /* fn[], fn[x,y] */ 
-
-                    if(cmd_name == '') throw new Error('cmdlet name is empty!');
-
-                    let cmd = srv.getCmd(cmd_name);
-                    if(cmd === null){
-                        throw new Error(`Invalid command: ${cmd_name}`);
-                    }
-
-                    return  { cmd, args };
-                }            
-
-                //Cascade: cmd1 * cmd2 * cmd 3
-                const cmdlets = param.split('*').map(e => e.trim()).filter(x => x !== '');
-                if(cmdlets.length === 0) return; //' * ', no cmd to execute, ignore.
-
-                if(cmdlets.length > 1){
-                    srv.title("Running Batch Cmds [" + param + "]...");
-
-                    let call_cmds = cmdlets.map(cmdlet => parseCmd(cmdlet));
-                    call_cmds.forEach((cc, i) => {
-                        let cmd = cc.cmd;
-                        if(typeof cmd.init === 'function'){
-                            cmd.init({
-                                args: cc.args,
-                                index: i,
-
-                                ccs: call_cmds
-                            });
-                        }
-                    });
-
-                    console.time(param);
-                    srv.runCmdsCascade(call_cmds, err => srv.summary(param, err));
-                }else{
-                    param = cmdlets[0];
-                    var call_cmd = parseCmd(param);
-                    let cmd = call_cmd.cmd;
-
-                    srv.title("[" + cmd.name + "]: " + cmd.help);
-                    console.time(param);
-                    srv.runCmd(cmd, call_cmd.args, err => srv.summary(param, err));
-                }
-            });
-        }catch(err){
-            srv.error(err);
-        }
+//input: array of cmdlet
+srv.execArray = function(cmds){
+    if(cmds.length == 0){//empty cmds, show menu
+        return srv.showMenu();
     }
+
+    try {
+        cmds.forEach(param => {
+            //parse cmdlet and returns { cmd, args }
+            //valid format:
+            //- fn : no param  => { cmd: fn, args: null }
+            //- fn(): no param => { cmd: fn, args: null }
+            //- fn('randy',20): param value list => { cmd: fn, args: ['randy', 20 ] }
+            //- fn(name: 'randy', age: 20): named param list (JSON5 compatible)
+            //  => { cmd: fn, args: { name: 'randy', age: 20 } }
+            //
+            // returns { cmd: null, args: null } if fn cannot be resolved.
+            function parseCmd(cmdlet){
+                console.log('cmdlet: ' + cmdlet);
+                let cmd_name = cmdlet;
+                let args = null;
+
+                //return true if func call is detected.
+                function parseCall(leftDelimeter, rightDelimiter){
+                    let i = cmdlet.indexOf(leftDelimeter);
+                    if(i !== -1){
+                        //fn() or fn(x,y, ...)
+                        let j = cmdlet.length-1;
+                        if( rightDelimiter !== cmdlet[j]) throw new Error(`parameter parsing error: no ending "${rightDelimiter}"`);
+
+                        cmd_name = cmdlet.substr(0, i);
+
+                        let params = cmdlet.substr(i+1, j-i-1).trim();
+
+                        if(params.length === 0){//fn()
+                        } else {// fn(x,y) or fn(name: 'x', age: y)
+                            //the most simplified parsing, the limit is that
+                            //the ':' should not exist in any value.
+                            if( -1 === params.indexOf(':')){
+                                args = params.split(',').map(x => x.trim());
+                            } else {
+                                args = JSON5.parse(`{${params}}`);
+                            }
+                        }
+                        return true;
+                    }
+                    return false;
+                }
+
+                parseCall('(', ')') /*fn(), fn(x,y)*/ || parseCall('[', ']'); /* fn[], fn[x,y] */ 
+
+                if(cmd_name == '') throw new Error('cmdlet name is empty!');
+
+                let cmd = srv.getCmd(cmd_name);
+                if(cmd === null){
+                    throw new Error(`Invalid command: ${cmd_name}`);
+                }
+
+                return  { cmd, args };
+            }            
+
+            //Cascade: cmd1 * cmd2 * cmd 3
+            const cmdlets = param.split('*').map(e => e.trim()).filter(x => x !== '');
+            if(cmdlets.length === 0) return; //' * ', no cmd to execute, ignore.
+
+            if(cmdlets.length > 1){
+                srv.title("Running Batch Cmds [" + param + "]...");
+
+                let call_cmds = cmdlets.map(cmdlet => parseCmd(cmdlet));
+                call_cmds.forEach((cc, i) => {
+                    let cmd = cc.cmd;
+                    if(typeof cmd.init === 'function'){
+                        cmd.init({
+                            args: cc.args,
+                            index: i,
+
+                            ccs: call_cmds
+                        });
+                    }
+                });
+
+                console.time(param);
+                srv.runCmdsCascade(call_cmds, err => srv.summary(param, err));
+            }else{
+                param = cmdlets[0];
+                var call_cmd = parseCmd(param);
+                let cmd = call_cmd.cmd;
+
+                srv.title("[" + cmd.name + "]: " + cmd.help);
+                console.time(param);
+                srv.runCmd(cmd, call_cmd.args, err => srv.summary(param, err));
+            }
+        });
+    }catch(err){
+        srv.error(err);
+    }
+}
+
+srv.run = function(args){
+    let tp = typeof args;
+    //execute cmds from process command line
+    if (tp === 'undefined') return srv.execArray(process.argv.slice(2));
+    //single command
+    if (tp === 'string') return srv.execArray([args]);
+    //array
+    if(Array.isArray(args)) return srv.execArray(args);
+
+    throw new Error(`run([args]): invalid args type "${tp}"!`);
 };
 
 // load a module/plugin

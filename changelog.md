@@ -1,7 +1,23 @@
 Changelog
 =========
 
+0.5.0: ( Apr. 12, 2018)
+-----------------------
+
+  enhanced api run(), now it can be invoked as following:
+
+* run(): executes process command line;
+* run('cmd'): executes a single command;
+* run(['cmd1', 'cmd2',...]): executes multiple cmds;
+
+
+0.4.2: ( Apr. 10, 2018
+-----------------------
+
+  fix doc and git url issue;
+
 0.4.1: ( Apr. 10, 2018)
+-----------------------
 
 * supports bash friendly cmdlet param delimiters.
 

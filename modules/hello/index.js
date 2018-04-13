@@ -34,7 +34,7 @@ module.exports = {
         srv.installCmd({
             name: "bar",
             help: "Say BAR",
-            sync: true, //sync version
+            //sync: true, //sync version
             
             run(){
                 srv.message('Hello BAR!\n');

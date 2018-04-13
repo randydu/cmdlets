@@ -40,21 +40,12 @@ module.exports = {
                 this.pre_cc = ccs[index-1];
             },
 
-            runPrevCmd(){
-                return new Promise((resolve, reject)=>{
-                    srv.runCmd(this.pre_cc.cmd, this.pre_cc.args, (err, rc) => {
-                        if(err) reject(err);
-                        resolve(null, rc);
-                    });
-                });
-            },
-
             async run(count, interval){
                 interval = typeof interval === 'undefined' ? 0 : +interval;
                 let i = count-1; //the previous cmd has been executed before
                 while(i > 0){
                     if(interval > 0) await delay(interval);
-                    await this.runPrevCmd();
+                    await srv.runCmd(this.pre_cc.cmd, this.pre_cc.args);
                     i--;
                 }
             }

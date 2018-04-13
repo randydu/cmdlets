@@ -13,7 +13,6 @@
   "author": "randydu@gmail.com",
   "license": "ISC",
   "dependencies": {
-    "async": "^2.6.0",
     "colors": "^1.1.2",
     "json5": "^1.0.1"
   }

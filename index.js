@@ -46,6 +46,17 @@ srv.getCmd = function(cmdName){
     return null;
 };
 
+//filter(cmd): boolean
+srv.getCmds = function(filter){
+    let cmds = [];
+
+    for(var name in srv.cmds){
+        let cmd = srv.cmds[name];
+        if(filter(cmd)) cmds.push(cmd);
+    }
+    return cmds;
+};
+
 //command warning
 srv.warning = function(msg){
     console.log(msg.toString().yellow);
@@ -184,19 +195,22 @@ srv.showMenu = function(){
     grp_names.sort();
 
     grp_names.forEach(grp_name => {
-        let cmds = grps[grp_name];
-        if(cmds.length > 0){
-            console.log('');
-            console.log(`[${grp_name}]`.blueBG);
-
-            //sort cmd by name
-            cmds.sort((a,b)=> a.name.localeCompare(b.name));
-
-            cmds.forEach(cmd => {
-                if(showHidden || !cmd.hidden) console.log("    " + cmd.name.yellow + ": " + (cmd.help).green);
-            });
-        }
+        srv.showGroupMenu(grp_name, grps[grp_name], showHidden);
     });
+}
+
+srv.showGroupMenu = function(grp_name, cmds, showHidden){
+    if(cmds.length > 0){
+        console.log('');
+        console.log(`[${grp_name}]`.blueBG);
+
+        //sort cmd by name
+        cmds.sort((a,b)=> a.name.localeCompare(b.name));
+
+        cmds.forEach(cmd => {
+            if(showHidden || !cmd.hidden) console.log("    " + cmd.name.yellow + ": " + (cmd.help).green);
+        });
+    }
 }
 
 //input: array of cmdlet

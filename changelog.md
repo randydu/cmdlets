@@ -1,6 +1,25 @@
 Changelog
 =========
 
+0.6.0: ( Apr. 14, 2018)
+-----------------------
+
+* adds api getCmds(filter) to return a subset of installed commands.
+
+  [SYNC] getCmds(filter): array of cmd object;
+
+  filter := function(cmd): boolean;
+
+  filter function returns true if cmd is to be included in the result.
+
+  ```javascript
+    cmdlets.getCmds(cmd => true); //all cmds
+    cmdlets.getCmds(cmd => !cmd.hidden); //visible cmds
+    cmdlets.getCmds(cmd => cmd.group === 'utility'); //cmds of group utility
+  ```
+
+
+
 0.5.0: ( Apr. 12, 2018)
 -----------------------
 

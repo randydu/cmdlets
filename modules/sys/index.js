@@ -50,5 +50,23 @@ module.exports = {
                 }
             }
         });
+
+        srv.installCmd({
+            name: 'help',
+            help: 'show sub-menu of a group, show top menu if no group specified. ex: help([grp_name])',
+
+            run(grp_name){
+                grp_name = grp_name || '';
+                if(grp_name == '') return srv.showMenu();
+
+                let cmds = srv.getCmds( cmd => cmd.group == grp_name );
+                if (cmds.length == 0){
+                    srv.message('no cmdlet in this group');
+                    return;
+                }
+
+                srv.showGroupMenu(grp_name, cmds, true); //show hidden cmdlets
+            }
+        })
     }
 }

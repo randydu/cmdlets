@@ -13,22 +13,24 @@ features:
 - cmd delay / repeat;
 - four types of cmd::run();
 
+For a cmdlet based console, please refer to npm package: [cmd-console](https://www.npmjs.com/package/cmd-console)
 
 ## Table of Contents
 
 1. [API](#API) 
 2. [Example](#Example) 
 3. [Environment](#env)
+4. [Built-in Commands](#built-in-cmds)
 
 ## API
 
 <a name="API"></a>
 
 ```javascript
-const cmdlets = require('cmdlets');
+const cmdlets = require("cmdlets");
 ```
 
-1. (SYNC) cmdlets.__loadModule(module_name, module_path)__
+1. [SYNC] cmdlets.__loadModule(module_name, module_path)__
 
    Loads a command module from a file path, it is a sync api. 
 
@@ -37,15 +39,16 @@ const cmdlets = require('cmdlets');
    The *module_name* is the default *group* name of the installed command when the module is being loaded, unless
    the group name is explicitly specified in the command object.
 
-2. (SYNC) cmdlets.__installCmd(command_object)__
+2. [SYNC] cmdlets.__installCmd(cmdlet)__
 
-    Install a command object.
+    Install a cmdlet object.
 
-    A command object has the following members:
+    A cmdlet object has the following members:
 
     - **name**: string, command name, must be unique in the installed commands; 
     - **help**: string, long description displayed in the top menu;
     - **group**: string [*optional*], the group this command belongs to. If not specified, the current module name is used.
+    - **hidden**: boolean [*optional*, default to __false__], if true, the cmd is not displayed in the top menu.
     - **run**: function, the function to be executed when the command is invoked.
 
       run() can be implemented in 4 ways:
@@ -71,15 +74,29 @@ const cmdlets = require('cmdlets');
          async run(){ return await do_something_complex(); }
         ```
 
-3. (SYNC) cmdlets.__getCmd(command_name)__
+3. [SYNC] cmdlets.__getCmd(cmdlet_name): cmdlet__
 
-   find command object by its name. return *null* if not found.
+   find cmdlet object by its name. return *null* if not found.
 
    ```javascript
    cmdlets.getCmd('hello').run('world');
    ```
 
-4. (ASYNC) cmdlets.__run([args])__
+4. [SYNC] cmdlets.__getCmds(filter)__: array of cmdlet object;
+
+    return a subset of installed cmdlets.
+ 
+    filter := function(cmd): boolean;
+
+    filter function returns true if the cmd should be included in the result.
+
+    ```javascript
+        cmdlets.getCmds(cmd => true); //all cmds
+        cmdlets.getCmds(cmd => !cmd.hidden); //visible cmds
+        cmdlets.getCmds(cmd => cmd.group === 'utility'); //cmds of group utility
+    ```
+
+5. (ASYNC) cmdlets.__run([args])__
 
    Execute command(s), returns a *promise*. 
    
@@ -89,7 +106,7 @@ const cmdlets = require('cmdlets');
 
   the commands specified by the process command line are executed.
 
-- **run(cmd_name)**: executes a single command;
+- **run(cmdlet_name)**: executes a single command;
 
     ```javascript
     cmdlets.run('hello(world)')
@@ -309,3 +326,8 @@ show hidden cmds:
 SHOW_HIDDEN_CMD=1 node index
 ```
 
+## Built-in Commands <a name="built-in-cmds">
+
+* __delay__
+* __repeat__
+* __help__

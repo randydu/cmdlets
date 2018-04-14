@@ -18,6 +18,9 @@ Changelog
     cmdlets.getCmds(cmd => cmd.group === 'utility'); //cmds of group utility
   ```
 
+* Hide hidden cmdlet' pre-run title, post-run feedback and timing summary.
+* rewrite the core in modern style.
+* Improves document;
 
 
 0.5.0: ( Apr. 12, 2018)

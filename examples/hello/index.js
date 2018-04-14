@@ -34,7 +34,6 @@ module.exports = {
         srv.installCmd({
             name: "bar",
             help: "Say BAR",
-            //sync: true, //sync version
             
             run(){
                 srv.message('Hello BAR!\n');
@@ -44,30 +43,11 @@ module.exports = {
         srv.installCmd({
             name: "dummy",
             help: "async dummy demo",
+            group: 'dummy', //explicit group name
             
             async run(){
                 srv.message('dummy!\n');
-                return;
             }
         });
-        //explicitly specify group to override default one (foobar)
-        srv.installCmd({
-            name: 'add',
-            group: 'math',
-            help: 'addition, ex: add( a, b)=> a+b',
-            async run(a, b){
-                srv.message(`${a}+${b}=${(+a)+(+b)}`);
-            }
-        });
-
-        srv.installCmd({
-            name: 'sub',
-            group: 'math',
-            help: 'substraction, ex: sub( a: 2, b: 1)=> a-b',
-            async run({a, b}){
-                //srv.message(`${a}-${b}=${(+a)-(+b)}`);
-                srv.message(`${a}-${b}=${a-b}`);
-            }
-        })
     }
 };

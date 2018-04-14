@@ -5,111 +5,114 @@ const fs = require("fs");
 const colors = require("colors");
 const JSON5 = require('json5');
 
-const srv = {};
+//Event Listener
+const EventEmitter = require('events');
 
-//export it!
-module.exports = srv;
+class MyEmitter extends EventEmitter {}
 
-srv.exitOnError = true; //abort on command error
 
-//current module name being loaded
-var cur_module_name = '';
-
+//[private data]
+const listener = new MyEmitter();
+//current group being loaded
+var cur_grp_name = '';
 //plugins
-srv.cmds = {};
-
+var cmds = {};
 //error messages
-srv.errors = {};
+var errors = {}; 
 
-srv.addError = function(cmdName, errMsg){
-    var errs = srv.errors[cmdName];
-    if(typeof errs == 'undefined'){
+//behavior
+var opt = {
+    exitOnError: true, //abort on command error
+}
+
+//[private functions]
+function addError(cmdName, errMsg){
+    var errs = errors[cmdName];
+    if(typeof errs === 'undefined'){
         errs = [];
-        srv.errors[cmdName] = errs;
+        errors[cmdName] = errs;
     }
     errs.push(errMsg);
 };
-      
-srv.installCmd = function(cmd){
-    if(typeof cmd.group === 'undefined'){
-        //cmd group node specified, fall back to default one (the current module name being loaded)
-        cmd.group = cur_module_name;
-    }
-
-    srv.cmds[cmd.name] = cmd;
-};
-
-srv.getCmd = function(cmdName){
-    for(var name in srv.cmds){
-        if ( name == cmdName ) return srv.cmds[name];
-      }
-    return null;
-};
-
-//filter(cmd): boolean
-srv.getCmds = function(filter){
-    let cmds = [];
-
-    for(var name in srv.cmds){
-        let cmd = srv.cmds[name];
-        if(filter(cmd)) cmds.push(cmd);
-    }
-    return cmds;
-};
 
 //command warning
-srv.warning = function(msg){
+function warning(msg){
     console.log(msg.toString().yellow);
-};
+}
 //command error
-srv.error = function(msg){
+function error(msg){
     console.log(msg.toString().red);
-};
-  
+}
 //command success 
-srv.success = function(msg){
+function success(msg){
     console.log(msg.red.toString().greenBG);
-};
-  
-//command title
-srv.title = function(msg){
+}
+//command pre-run title
+function preRunTitle(msg){
     console.log(msg.toString().rainbow);
-};
-
+}
+function postRunTitle(msg){
+    console.log(msg.toString().blueBG);
+}
 //command message
-srv.message = function(msg){
+function message(msg){
     console.log(msg.toString());
-};
-  
-srv.summary = function(name, err){
+}
+
+//post-run summary
+function summary(name, err, hidden){
     if(err){
-        let msg = "[" + name + "]: err = " + err;
-        console.log(msg.blueBG);
+        postRunTitle(`[${name}]: err = ${err}`);
         //Error dump
-        for(var cmdName in this.errors){
-            var errs = this.errors[cmdName];
-            var s = cmdName + ': errors [' + errs.length + ']';
-            console.log(s.red);
-    
-            for( var i in errs){
-                console.log(("[" + i + "]: ").red);
-                console.log(errs[i].red);
-            }
+        for(var cmdName in errors){
+            var errs = errors[cmdName];
+            error(`${cmdName}: errors [ ${errs.length}]`);
+            errs.forEach((err, i)=> error(`[${i}]: ${err}`));
         }
     }else{
-        let msg = "[" + name + "]: OK";
-        console.log(msg.blueBG);
+        if(!hidden){
+            postRunTitle(`[${name}]: OK`);
+        }
     }
-    console.timeEnd(name);
+    if(!hidden) console.timeEnd(name);
 };
-  
+ 
+//--- cmd management --------------------------
+
+function installCmd(cmd){
+    if(typeof cmd.group === 'undefined'){
+        //cmd group node specified, fall back to default one (the current group name being loaded)
+        cmd.group = cur_grp_name;
+    }
+    cmds[cmd.name] = cmd;
+
+    listener.emit('cmd_added', cmd);
+}
+
+function getCmd(cmdName){
+    for(var name in cmds){
+        if ( name == cmdName ) return cmds[name];
+    }
+    return null;
+}
+
+//filter(cmd): boolean
+function getCmds(filter){
+    let result = [];
+
+    for(var name in cmds){
+        let cmd = cmds[name];
+        if(filter(cmd)) result.push(cmd);
+    }
+    return result;
+}
 //call cmd with args
 //if args is of an array, the cmd.run() assumes to accept param list;
 //otherwise it is accepting null or object as command parameter; 
-srv.runCmd = function(cmd, args){
+function runCmd(cmd, args){
     return new Promise((resolve, reject)=>{
         if(typeof cmd === 'string'){//call by name
-            let my_cmd = srv.getCmd(cmd);
+            let my_cmd = getCmd(cmd);
             if(my_cmd === null) return reject(new Error(`Invalid command: ${cmd}`));
 
             cmd = my_cmd;
@@ -127,10 +130,10 @@ srv.runCmd = function(cmd, args){
 
         function feedback(err, rc){
             if(err){
-                srv.error(cmd.name + ": error " + err);
+                error(`${cmd.name}: error ${err}`);
                 //if(srv.exitOnError) process.exit(1);
             }else{
-                srv.success(cmd.name + ": done!");
+                if(!cmd.hidden) success(`${cmd.name}: done!`);
             }
         }
 
@@ -161,63 +164,19 @@ srv.runCmd = function(cmd, args){
 };
 
 function getTasks(call_cmds){
-    return call_cmds.map(cc => srv.runCmd.bind(null, cc.cmd, cc.args));
+    return call_cmds.map(cc => runCmd.bind(null, cc.cmd, cc.args));
 }
 
 //cmds: array of cmd
-srv.runCmdsCascade = function(call_cmds){
+function runCmdsCascade(call_cmds){
     return getTasks(call_cmds).reduce((p, task)=> p.then(task), Promise.resolve());
 };
 
-srv.showMenu = function(){
-    console.log(`Format:  node ${path.basename(process.argv[1])} [cmd1, cmd2, ...]\n`);
-    console.log("Available commands are:\n");
-
-    let showHidden = Boolean(+process.env.SHOW_HIDDEN_CMD);
-
-    //populate cmds by group
-    let grps = {};
-    let grp_names = [];
-    
-    for(let name in srv.cmds){
-        let cmd = srv.getCmd(name);
-        let grp_name = cmd.group;
-
-        if(typeof grps[grp_name] === 'undefined'){
-            grps[grp_name] = [];
-            grp_names.push(grp_name);
-        }
-
-        if(showHidden || !cmd.hidden) grps[grp_name].push(cmd);
-    }
-
-    //sort group name
-    grp_names.sort();
-
-    grp_names.forEach(grp_name => {
-        srv.showGroupMenu(grp_name, grps[grp_name], showHidden);
-    });
-}
-
-srv.showGroupMenu = function(grp_name, cmds, showHidden){
-    if(cmds.length > 0){
-        console.log('');
-        console.log(`[${grp_name}]`.blueBG);
-
-        //sort cmd by name
-        cmds.sort((a,b)=> a.name.localeCompare(b.name));
-
-        cmds.forEach(cmd => {
-            if(showHidden || !cmd.hidden) console.log("    " + cmd.name.yellow + ": " + (cmd.help).green);
-        });
-    }
-}
-
 //input: array of cmdlet
 //return: promise
-srv.execArray = function(cmds){
+function execArray(cmds){
     if(cmds.length == 0){//empty cmds, show menu
-        srv.showMenu();
+        showMenu();
         return Promise.resolve();
     }
 
@@ -267,7 +226,7 @@ srv.execArray = function(cmds){
 
             if(cmd_name == '') throw new Error('cmdlet name is empty!');
 
-            let cmd = srv.getCmd(cmd_name);
+            let cmd = getCmd(cmd_name);
             if(cmd === null){
                 throw new Error(`Invalid command: ${cmd_name}`);
             }
@@ -283,11 +242,11 @@ srv.execArray = function(cmds){
             if(cmdlets.length === 0) return; //' * ', no cmd to execute, ignore.
 
             if(cmdlets.length > 1){
-                srv.title("Running Batch Serial Cmds [" + param + "]...");
+                preRunTitle(`Running Batch Serial Cmds [${param}]...`);
 
                 let call_cmds = cmdlets.map(cmdlet => parseCmd(cmdlet));
 
-                //call cmd.init() if defined
+                //call cmd.init() if defined for inter-cmd settings
                 call_cmds.forEach((cc, i) => {
                     let cmd = cc.cmd;
                     if(typeof cmd.init === 'function'){
@@ -302,60 +261,148 @@ srv.execArray = function(cmds){
 
                 console.time(param);
                 
-                tasks.push(srv.runCmdsCascade(call_cmds)
-                .then(()=> srv.summary(param, null))
-                .catch(err => srv.summary(param, err)));
+                tasks.push(runCmdsCascade(call_cmds)
+                .then(()=> summary(param, null, false))
+                .catch(err => summary(param, err, false)));
             }else{
                 param = cmdlets[0];
                 var call_cmd = parseCmd(param);
                 let cmd = call_cmd.cmd;
 
-                srv.title("[" + cmd.name + "]: " + cmd.help);
-                console.time(param);
+                if(!cmd.hidden){
+                    preRunTitle(`[${cmd.name}]: ${cmd.help}`);
+                    console.time(param);
+                } 
                 
-                tasks.push(srv.runCmd(cmd, call_cmd.args)
-                .then(()=> srv.summary(param, null))
-                .catch(err => srv.summary(param, err)));
+                tasks.push(runCmd(cmd, call_cmd.args)
+                .then(()=> summary(param, null, cmd.hidden))
+                .catch(err => summary(param, err, cmd.hidden)));
             }
         });
 
         return Promise.all(tasks);
     }catch(err){
-        srv.error(err);
+        error(err);
         return Promise.reject(err);
     }
 }
 
-//return promise
-srv.run = function(args){
-    let tp = typeof args;
-    //execute cmds from process command line
-    if (tp === 'undefined') return srv.execArray(process.argv.slice(2));
-    //single command
-    if (tp === 'string') return srv.execArray([args]);
-    //array
-    if(Array.isArray(args)) return srv.execArray(args);
+//------ Menu -----------
 
-    return Promise.reject(new Error(`run([args]): invalid args type "${tp}"!`));
-};
+function showGroupMenu(grp_name, cmds, showHidden){
+    if(cmds.length > 0){
+        console.log('');
+        console.log(`[${grp_name}]`.blueBG);
 
-// load a module/plugin
-srv.loadModule = function(name, dir){
-    cur_module_name = name; //default group name, ref: installCmd()
-    require(dir).init(srv);
-    cur_module_name = '';
-};
+        //sort cmd by name
+        cmds.sort((a,b)=> a.name.localeCompare(b.name));
 
-//Loading built-in plugins in sub-folder "modules"
-let local_module_dir = __dirname + "/modules/";
-if(fs.existsSync(local_module_dir)){
-    fs.readdirSync(local_module_dir).forEach( m => {
-        srv.loadModule(m, local_module_dir + m);
+        cmds.forEach(cmd => {
+            if(showHidden || !cmd.hidden) console.log("    " + cmd.name.yellow + ": " + (cmd.help).green);
+        });
+    }
+}
+
+function showMenu(){
+    console.log(`Format:  node ${path.basename(process.argv[1])} [cmd1, cmd2, ...]\n`);
+    console.log("Available commands are:\n");
+
+    let showHidden = Boolean(+process.env.SHOW_HIDDEN_CMD);
+
+    //populate cmds by group
+    let grps = {};
+    let grp_names = [];
+    
+    for(let name in cmds){
+        let cmd = getCmd(name);
+        let grp_name = cmd.group;
+
+        if(typeof grps[grp_name] === 'undefined'){
+            grps[grp_name] = [];
+            grp_names.push(grp_name);
+        }
+
+        if(showHidden || !cmd.hidden) grps[grp_name].push(cmd);
+    }
+
+    //sort group name
+    grp_names.sort();
+
+    grp_names.forEach(grp_name => {
+        showGroupMenu(grp_name, grps[grp_name], showHidden);
     });
 }
 
+//----- PUBLIC ----------------------
+
+const cmdlets = {
+    //menu
+    showMenu,
+    showGroupMenu,
+
+    //render
+    warning,
+    error,
+    success,
+    message,
+
+    //Register Event Listener
+    //event: 'cmd_added' => watcher(cmd)
+    on(event, watcher){
+        listener.on(event, watcher);
+    },
+
+    installCmd,
+    getCmd,
+    getCmds,
+
+    runCmd, //undocemented
+
+    //return promise
+    run(args){
+        let tp = typeof args;
+        //execute cmds from process command line
+        if (tp === 'undefined') return execArray(process.argv.slice(2));
+        //single command
+        if (tp === 'string') return execArray([args]);
+        //array
+        if(Array.isArray(args)) return execArray(args);
+
+        return Promise.reject(new Error(`run([args]): invalid args type "${tp}"!`));
+    },
+    //---- Module Management ---------
+    // load a module/plugin [DEPRECATED by addModule()]
+    loadModule(grp_name, dir){
+        console.warn('WARN: API loadModule will be deprecated by addModule!\n');
+
+        this.addModule(dir, grp_name);
+    },
+
+    // load a module/plugin
+    addModule(dir, grp_name){
+        cur_grp_name = grp_name || path.basename(dir); //default group name, ref: installCmd()
+        require(dir).init(this);
+        cur_grp_name = '';
+    },
+
+    // load all modules under a directory (non-recursive)
+    addModuleDir(dir){
+        if(fs.existsSync(dir)){
+            fs.readdirSync(dir).forEach( m => {
+                this.addModule(dir + '/' + m, m);
+            });
+        }
+    }
+};
+
+//export it!
+module.exports = cmdlets;
+
+//Loading built-in plugins in sub-folder "modules"
+cmdlets.addModuleDir(__dirname + "/modules");
+
 //Hide all built-in cmds so it won't be shown in cmd menu.
-//However, they can still be executed by srv.getCmd('hello');
-for(var m in srv.cmds){
-    srv.cmds[m].hidden = true;
+//However, they can still be executed by cmdlets.getCmd('hello');
+for(var name in cmds){
+    cmds[name].hidden = true;
 }

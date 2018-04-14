@@ -6,7 +6,7 @@ A simple command-oriented system
 
 features:
 
-- cmd execution order serial or parallel;
+- cmd execution order: serial or parallel;
 - cmd timing;
 - cmd parameters;
 - cmd group;
@@ -17,12 +17,156 @@ For a cmdlet based console, please refer to npm package: [cmd-console](https://w
 
 ## Table of Contents
 
-1. [API](#API) 
-2. [Example](#Example) 
-3. [Environment](#env)
-4. [Built-in Commands](#built-in-cmds)
+- [Cmdlet Module](#module)
+- [Cmdlet Group](#group)
+- [Cmdlet Object](#cmdlet)
+- [Cmdlets API](#API)
+- [Example](#Example) 
+- [Environment](#env)
+- [Built-in Cmdlet](#built-in-cmds)
 
-## API
+## Cmdlet Module <a name="#module"></a>
+
+A cmdlet module acts as a *physical* container for a group of related cmdlet objects.
+
+It is bascially a plugin that can be downloaded, deployed and loaded at runtime by cmdlets.
+
+Being a standard nodejs module that can be *required*, the **module.exports** must expose an **init()** function in which all local cmdlets can be installed:
+
+```
+my_module/
+    index.js
+```
+
+```javascript
+
+my_module/index.js:
+
+module.exports = {
+    init(cmdlets){
+        //do any module-specific initial logic.
+        ...
+        
+        cmdlets.installCmd({
+            name: 'cmd1',
+            help: 'demo 1',
+            run(){}
+        });
+
+        cmdlets.installCmd({
+            name: 'cmd2',
+            help: 'demo 2',
+            run(){}
+        });
+
+        ...
+    }
+}
+```
+
+A cmdlet module can be deployed under a common folder (for example, "plugins"):
+
+```
+plugins/
+├── module_1
+│   └── index.js
+├── module_2
+│   └── index.js
+└── module_3
+    └── index.js
+```
+
+And in your source code all of the plugin modules can be loaded as follows:
+
+```javascript
+cmdlets.addModuleDir(full_path_to_plugins);
+```
+
+Or you can also load an individual module by calling api:
+
+```javascript
+cmdlets.addModule(full_path_to_module, group_name);
+```
+
+According to your business requirement, extra meta data can be added to a module. For example, a manifest file in the package to define the group name, a version tag to help upgrade to the latest version, a download url to fetch the new releases.
+
+## Cmdlet Group <a name="#group"></a>
+
+A cmdlet group is a *virtual* container for a subset of related cmdlet objects, which are grouped and displayed together
+on the help menu.
+
+A cmdlet belongs to one and only one group;
+
+A cmdlet is implemented and deployed in one and only one module;
+
+A module can host cmdlets of different groups;
+
+You can think of cmdlet group as a unique _namespace_ of modern OOP langurage, and cmdlet module is an code assembly or library to host cmdlets.
+
+
+## Cmdlet Object <a name="#cmdlet"></a>
+
+A cmdlet object has the following members:
+
+- **name**: string, command name, must be unique in the installed commands; 
+- **help**: string, long description displayed in the top menu;
+- **group**: string [*optional*], the group this command belongs to. If not specified, the current module name is used.
+
+- **hidden**: boolean [*optional*, default to __false__]
+
+    A hidden cmdlet:
+    1. will not appear on the help menu;
+    2. no pre-run title, post-run feedback and timing summary;
+
+    all built-in cmdlets are hidden.
+
+- **run**: function, the function to be executed when the command is invoked.
+
+    run() can be implemented in 4 ways:
+
+    1. sync function;
+
+    ```javascript
+        run(whom){ console.log('hello ' + whom); }
+    ```
+    2. async function with classic callback;
+
+    ```javascript
+        run(callback){ do_something_complex(callback); }
+    ```
+    3. async function returns a promise;
+    
+    ```javascript
+        run(loops){ return do_something_complex(loops) .then(console.log); }
+    ```
+
+    4. async function with new __async__ keyword; 
+    ```javascript
+        async run(){ return await do_something_complex(); }
+    ```
+
+To run a cmdlet programmatically in source code:
+
+```javascript
+cmdlets.getCmd('add').run(1,2);
+```
+
+or use the universal cmdlet running api as follows:
+
+```javascript
+//promise-style
+cmdlets.run('add(1,2)').then(result =>...)
+
+//new await-style
+let result = await cmdlets.run('add(1,3)');
+```
+
+The first calling method looks simple but you have to ensure the calling protocol is matched to the run() function, because
+it might accept parameters and works in async or sync workflow --- your calling site must have exact knowledge of what the cmdlet is doing.
+
+However, the second calling method will *adapt* all cmdlet.run() method as a function returning a promise, so it is easier to call especially when the input is from end user, and you have no knowledge of how the cmdlet is implemented. 
+
+## Cmdlets API
 
 <a name="API"></a>
 
@@ -30,51 +174,37 @@ For a cmdlet based console, please refer to npm package: [cmd-console](https://w
 const cmdlets = require("cmdlets");
 ```
 
-1. [SYNC] cmdlets.__loadModule(module_name, module_path)__
+1. [SYNC] cmdlets.__addModule(module_path, [group_name])__
 
-   Loads a command module from a file path, it is a sync api. 
+   Loads a cmdlet module from a file path.
 
-   Basically the module loading logic is: __require__(module_path).__init__(cmdlets)
+   Basically the module loading workflow is: __require__(module_path).__init__(cmdlets)
 
-   The *module_name* is the default *group* name of the installed command when the module is being loaded, unless
-   the group name is explicitly specified in the command object.
+   The optional *group_name* is the default *group* name of the installed command when the module is being loaded, unless
+   the group name is explicitly defined by the cmdlet object.
 
-2. [SYNC] cmdlets.__installCmd(cmdlet)__
+   If the *group_name* is not specified, the basename of the *module_path* is used as default group name.
 
-    Install a cmdlet object.
+   ```javascript
+     //group name is "myapp.system"
+     cmdlets.addModule('/opt/myapp/modules/sys', 'myapp.system');
+     //group name is "sys"
+     cmdlets.addModule('/opt/myapp/modules/sys');
+   ```
 
-    A cmdlet object has the following members:
+2. [SYNC] cmdlets.__addModuleDir(path)__
 
-    - **name**: string, command name, must be unique in the installed commands; 
-    - **help**: string, long description displayed in the top menu;
-    - **group**: string [*optional*], the group this command belongs to. If not specified, the current module name is used.
-    - **hidden**: boolean [*optional*, default to __false__], if true, the cmd is not displayed in the top menu.
-    - **run**: function, the function to be executed when the command is invoked.
+   Loads all command modules under a path, it scans (non-recursively) the folder and calls *addModule* to load each module.
 
-      run() can be implemented in 4 ways:
+   When loading a module from a sub-folder, the *group name* is the sub-folder's basename by default, unless
+   the it is explicitly specified by the cmdlet object being installed.
 
-      1. sync function;
+3. [SYNC] cmdlets.__installCmd(cmdlet)__
 
-        ```javascript
-         run(whom){ console.log('hello ' + whom); }
-        ```
-      2. async function with classic callback;
+    Install a cmdlet object. It is usually called when the cmdlet's module is being loaded. You can also call it to add
+    any cmdlet in your source code.
 
-        ```javascript
-         run(callback){ do_something_complex(callback); }
-        ```
-      3. async function returns a promise;
-      
-        ```javascript
-         run(loops){ return do_something_complex(loops) .then(console.log); }
-        ```
-
-      4. async function with new __async__ keyword; 
-        ```javascript
-         async run(){ return await do_something_complex(); }
-        ```
-
-3. [SYNC] cmdlets.__getCmd(cmdlet_name): cmdlet__
+4. [SYNC] cmdlets.__getCmd(cmdlet_name): cmdlet__
 
    find cmdlet object by its name. return *null* if not found.
 
@@ -82,7 +212,7 @@ const cmdlets = require("cmdlets");
    cmdlets.getCmd('hello').run('world');
    ```
 
-4. [SYNC] cmdlets.__getCmds(filter)__: array of cmdlet object;
+5. [SYNC] cmdlets.__getCmds(filter)__: array of cmdlet object;
 
     return a subset of installed cmdlets.
  
@@ -96,7 +226,7 @@ const cmdlets = require("cmdlets");
         cmdlets.getCmds(cmd => cmd.group === 'utility'); //cmds of group utility
     ```
 
-5. (ASYNC) cmdlets.__run([args])__
+6. [ASYNC] cmdlets.__run([args])__
 
    Execute command(s), returns a *promise*. 
    
@@ -132,7 +262,7 @@ In this sample, we will develop a demo cmdlet in foobar sub-folder "foobar":
 
 module.exports = {
     init(srv){
-        //install commands (default group: 'foobar' specified in srv.loadModule())
+        //install commands (default group: 'foobar' specified in srv.addModule())
         srv.installCmd({
             name: 'foo',
             help: 'demo of async-callback',
@@ -201,7 +331,7 @@ module.exports = {
 const cmdlets = require('cmdlets');
 
 //install foobar module
-cmdlets.loadModule('foobar', __dirname + '/foobar');
+cmdlets.addModule(__dirname + '/foobar');
 
 //parses & run cmds from command line
 cmdlets.run();
@@ -326,8 +456,34 @@ show hidden cmds:
 SHOW_HIDDEN_CMD=1 node index
 ```
 
-## Built-in Commands <a name="built-in-cmds">
+## Built-in Cmdlets <a name="built-in-cmds"></a>
 
-* __delay__
-* __repeat__
-* __help__
+1. __delay(seconds)__: delay a period of time before next cmdlet is executed.
+
+    ```javascript
+    cmdlets.run("foo * delay(5) * bar");
+    ```
+
+    Executes cmdlet foo first, then delay 5 seconds before cmdlet bar start running.
+
+
+2. __repeat(times, [interval=0])__: repeat running a cmdlet multiple times with a time interval.
+
+    ```bash
+    node index "foo * repeat(100, 60)"
+    ```
+
+    Repeat running cmdlet foo 100 times with a 60 seconds delay in between.
+
+
+3. __help([group_name])__: show help menu of a group.
+
+    If *group_name* is not specified, the top menu is displayed. 
+
+    ```bash
+    # show top menu
+    node index help
+
+    # show sub-menu of system group
+    node index help[system]
+    ```

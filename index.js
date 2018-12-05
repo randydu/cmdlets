@@ -214,7 +214,14 @@ function execArray(cmds){
                         if( -1 === params.indexOf(':')){
                             args = params.split(',').map(x => x.trim());
                         } else {
-                            args = JSON5.parse(`{${params}}`);
+                            try {
+																//named parameters?
+                                args = JSON5.parse(`{${params}}`);
+                            }catch(ex){
+                                //the worst case just return the splitted array.
+															  //it can be useful to pass url parameter such as cmd(http://example.com:8080/).
+                                args = params.split(',').map(x => x.trim());
+                            }
                         }
                     }
                     return true;

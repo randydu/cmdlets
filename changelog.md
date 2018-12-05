@@ -1,6 +1,14 @@
 Changelog
 =========
 
+0.7.0: ( Dec. 5, 2018)
+-----------------------
+
+Improve cmdlet parameter parsing to support simple parameter with ':'.
+
+ex:  cmd(http://www.example.com:8080/);
+
+
 0.6.0: ( Apr. 14, 2018)
 -----------------------
 

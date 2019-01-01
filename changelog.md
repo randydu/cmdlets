@@ -1,6 +1,12 @@
 Changelog
 =========
 
+0.7.1: ( Dec. 31, 2018)
+
+- Improve doc;
+- change git repository from bitbucket to github;
+
+
 0.7.0: ( Dec. 5, 2018)
 -----------------------
 

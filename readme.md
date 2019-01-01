@@ -248,6 +248,12 @@ const cmdlets = require("cmdlets");
     cmdlets.run(['foo*bar', 'add(1,2)'])
     ```
 
+7. Message output with different color scheme
+
+- cmdlets.__message__(message);
+- cmdlets.__warning__(message);
+- cmdlets.__error__(message);
+- cmdlets.__success__(message);
 
 
 ## Example
